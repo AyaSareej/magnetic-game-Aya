@@ -23,23 +23,27 @@ Enter the new coordinates for the piece (new_x new_y): 2 2
 Piece moved.
 
 
-```markdown
-```
 Grid game state:
   0   1   2   3   4
+  
  +-------------------+
 0 | .   .   I   .   . |
- +-------------------+
+
+ 
 1 | .   .   .   .   . |
- +-------------------+
+
+ 
 2 | I   .   R   .   I |
- +-------------------+
+
+ 
 3 | .   .   .   .   . |
- +-------------------+
+
+
 4 | .   .   I   .   . |
+
  +-------------------+
-```
-```
+ 
+
 8. في النهاية، ستظهر لك رسالة التهنئة:
 Congratulations! You've completed the level!
 
