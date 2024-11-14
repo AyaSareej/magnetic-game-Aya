@@ -24,9 +24,11 @@ Piece moved.
 
 
 Grid game state:
+
   0   1   2   3   4
   
  +-------------------+
+ 
 0 | .   .   I   .   . |
 
  
