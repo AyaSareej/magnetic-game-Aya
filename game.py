@@ -1,33 +1,38 @@
 class Piece:
-    def __init__(self, color, is_magnetic, position):
-        """Initialize piece with its color, magnetic status, and position."""
-        self.color = color
-        self.is_magnetic = is_magnetic
+    def __init__(self, piece_type, position):
+        """Initialize piece with its type and position."""
+        self.piece_type = piece_type  # 'repulsive', 'iron', etc.
         self.position = position  # [x, y]
 
     def __str__(self):
-        return f"{self.color[0].upper()}"  # Display first letter of color
+        """Display 'R' for repulsive, 'I' for iron, etc."""
+        if self.piece_type == "repulsive":
+            return "R"
+        elif self.piece_type == "iron":
+            return "I"
+        elif self.piece_type == "attractive":
+            return "A"
+        return "?"
 
 
 class Board:
-    def __init__(self, size, targets=None, blocks=None, pieces=None):
+    def __init__(self, size, targets=None, pieces=None):
         self.size = size
         self.grid = [[None for _ in range(size)] for _ in range(size)]  # 2D grid initialization
         self.targets = targets if targets else []  # List of target positions (goal spots)
-        self.blocks = blocks if blocks else []  # List of blocked positions
-        self.pieces = []
-        
+        self.pieces = []  # Track all pieces for easy access
+
         # Initialize pieces on the board
         if pieces:
             for piece_data in pieces:
-                piece = Piece(piece_data['color'], piece_data['is_magnetic'], piece_data['position'])
+                piece = Piece(piece_data['piece_type'], piece_data['position'])
                 self.add_piece(piece, piece_data['position'][0], piece_data['position'][1])
 
     def add_piece(self, piece, x, y):
         """Add a piece to the board at position (x, y)."""
         if 0 <= x < self.size and 0 <= y < self.size:
             self.grid[x][y] = piece
-            self.pieces.append(piece)  # Keep track of pieces on the board
+            self.pieces.append(piece)
         else:
             print("Position is out of the game boundaries")
 
@@ -41,11 +46,10 @@ class Board:
             row_display = f"{i}| "
             for j, cell in enumerate(row):
                 if cell is None:
-                    # Display 'T' for target locations if they are empty
+                    # Display 'T' if it is a target cell and currently empty
                     row_display += " T " if (i, j) in self.targets else " . "
                 else:
-                    # Display the piece type
-                    row_display += f" {cell} "  
+                    row_display += f" {cell} "  # Display piece type
             row_display += "|"
             print(row_display)
         
@@ -66,6 +70,10 @@ class Board:
             print("No piece at starting position.")
             return False
 
+        if piece.piece_type == "iron":
+            print("Iron pieces cannot be moved manually.")
+            return False
+
         if self.grid[new_x][new_y] is not None:
             print("Target cell is occupied.")
             return False
@@ -79,32 +87,99 @@ class Board:
             return False
 
         # Move the piece to the new location and clear the old spot
-        self.grid[new_x][new_y] = self.grid[x][y]
+        piece = self.grid[x][y]
+        self.grid[new_x][new_y] = piece
         self.grid[x][y] = None  # Clear original position of the piece
+        piece.position = [new_x, new_y]  # Update piece's internal position
+        self.apply_magnetic_effects(new_x, new_y)  # Apply magnetic effects after moving
         return True
+
+    def apply_magnetic_effects(self, x, y):
+        """Apply attraction and repulsion effects around the moved piece."""
+        piece = self.grid[x][y]
+        if piece is None:
+            return
+
+        # Define directional offsets
+        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+        for dx, dy in directions:
+            nx, ny = x + dx, y + dy
+            if self.is_within_bounds(nx, ny):
+                target_piece = self.grid[nx][ny]
+                if target_piece and target_piece.piece_type == "iron":
+                    if piece.piece_type == "attractive":
+                        # Move iron piece toward the attractive piece
+                        target_x, target_y = x - dx, y - dy
+                        if self.is_within_bounds(target_x, target_y) and self.grid[target_x][target_y] is None:
+                            self.grid[target_x][target_y] = target_piece
+                            self.grid[nx][ny] = None
+                            target_piece.position = [target_x, target_y]
+                    elif piece.piece_type == "repulsive":
+                        # Move iron piece away from the repulsive piece
+                        target_x, target_y = nx + dx, ny + dy
+                        if self.is_within_bounds(target_x, target_y) and self.grid[target_x][target_y] is None:
+                            self.grid[target_x][target_y] = target_piece
+                            self.grid[nx][ny] = None
+                            target_piece.position = [target_x, target_y]
 
     def check_win_condition(self):
         """Check if all target positions are occupied by pieces."""
         for (x, y) in self.targets:
             if self.grid[x][y] is None:
                 return False
-        return True
+        return True 
 
 
 class Level:
     def __init__(self, level_data):
         """Initialize a level using provided level data."""
         self.board_size = level_data['board_size']
-        self.target_cells = level_data['target_cells']
-        self.block_cells = level_data['block_cells']
+        self.target_cells = [(x[0], x[1]) for x in level_data['target_cells']]
         self.pieces = level_data['pieces']
-        self.board = Board(self.board_size, self.target_cells, self.block_cells, self.pieces)
+        self.board = Board(self.board_size, self.target_cells, pieces=self.pieces)
 
     def start(self):
         """Start the level."""
         print(f"Starting Level with board size {self.board_size}")
-        self.board.display_board()
-        # Here you can add the logic to play the level
+        self.play()
+
+    def play(self):
+        """Main game loop to allow player to move pieces."""
+        while True:
+            self.board.display_board()
+            
+            if self.board.check_win_condition():
+                print("Congratulations! You've completed the level!")
+                if not self.ask_for_next_action():
+                    return  # Exit to level selection
+
+            try:
+                x, y = map(int, input("Enter the coordinates of the piece you want to move (x y): ").strip().split())
+                if not self.board.is_within_bounds(x, y) or self.board.grid[x][y] is None:
+                    print("Invalid selection. Please select a valid piece.")
+                    continue
+
+                new_x, new_y = map(int, input("Enter the new coordinates for the piece (new_x new_y): ").strip().split())
+            except ValueError:
+                print("Invalid input. Please enter valid integer coordinates, separated by spaces.")
+                continue
+
+            if self.board.move_piece(x, y, new_x, new_y):
+                print("Piece moved.")
+            else:
+                print("Invalid move, please try again.")
+
+    def ask_for_next_action(self):
+        """Ask the player whether to restart the level or choose another level."""
+        while True:
+            action = input("Do you want to (R)estart this level or (C)hoose another level? (R/C): ").strip().upper()
+            if action == 'R':
+                self.start()  # Restart the current level
+                return True
+            elif action == 'C':
+                return False  # Go back to level selection
+            else:
+                print("Invalid input. Please enter 'R' or 'C'.")
 
 
 class Game:
@@ -114,214 +189,41 @@ class Game:
 
     def choose_level(self):
         """Allow the player to choose a level."""
-        print("Choose a level to play:")
-        for i, level in enumerate(self.levels):
-            print(f"Level {i + 1}: Board Size {level.board_size}")
+        while True:
+            print("Choose a level to play:")
+            for i, level in enumerate(self.levels):
+                print(f"Level {i + 1}: Board Size {level.board_size}")
 
-        choice = int(input("Enter the level number you want to play: ")) - 1
-        if 0 <= choice < len(self.levels):
-            self.levels[choice].start()
-        else:
-            print("Invalid level choice. Please try again.")
+            choice = int(input("Enter the level number you want to play: ")) - 1
+            if 0 <= choice < len(self.levels):
+                self.levels[choice].start()
+            else:
+                print("Invalid level choice. Please try again.")
 
 
-# Example levels data
+# Sample levels data
 levels_data = [
-    {
-        "board_size": 5,
-        "target_cells": [[0, 2], [1, 3], [4, 4]],
-        "block_cells": [[2, 2], [3, 3],[3, 0]],
-        "pieces": [
-            {"color": "red", "is_magnetic": true, "position": [0, 0]},
-            {"color": "red", "is_magnetic": true, "position": [0, 4]},
-            {"color": "purple", "is_magnetic": true, "position": [1, 1]},
-            {"color": "purple", "is_magnetic": true, "position": [1, 2]},
-            {"color": "grey", "is_magnetic": false, "position": [2, 1]}
-        ]
-    },
     {
         "board_size": 4,
         "target_cells": [[1, 1], [1, 3]],
-        "block_cells": [],
         "pieces": [
-           
-            {"color": "purple", "is_magnetic": true, "position": [3, 0]},
-            {"color": "grey", "is_magnetic": false, "position": [1, 2]}
+            {"piece_type": "repulsive", "position": [2, 0]},
+            {"piece_type": "iron", "position": [1, 2]}
         ]
     },
-    {
+       {
         "board_size": 5,
-        "target_cells": [[0, 2], [2, 0], [2, 2],[2,4],[4,2]],
-        "block_cells": [],
+        "target_cells": [[0, 2], [2, 0], [2, 2], [4, 2], [2, 4]],
         "pieces": [
-            {"color": "purple", "is_magnetic": true, "position": [4, 0]},
-            {"color": "grey", "is_magnetic": false, "position": [1, 2]},
-            {"color": "grey", "is_magnetic": false, "position": [2, 1]},
-            {"color": "grey", "is_magnetic": false, "position": [2, 3]},
-            {"color": "grey", "is_magnetic": false, "position": [3, 2]}
-        ]
-    }, 
-    {
-        "board_size": 4,
-        "target_cells": [[0, 3],[2, 3]],
-        "block_cells": [[0, 0], [0, 1],[0, 2],[3,0],[3,1],[3,2],[3,3]],
-        "pieces": [
-          
-            {"color": "purple", "is_magnetic": true, "position": [2, 0]},
-          
-            {"color": "grey", "is_magnetic": false, "position": [1, 2]}
-        ]
-    },
-    {
-        "board_size": 5,
-        "target_cells": [[0, 0],[0, 2],[4,1]],
-        "block_cells": [[0, 3], [0, 4],[1, 3],[1,4],[2,3],[2,4],[3,3],[3,4],[4,3],[4,4],[1,0],[3,0]],
-        "pieces": [
-          
-            {"color": "purple", "is_magnetic": true, "position": [2, 0]},
-          
-            {"color": "grey", "is_magnetic": false, "position": [1, 1]},
-            {"color": "grey", "is_magnetic": false, "position": [3, 1]}
-        ]
-    },
-    {
-        "board_size": 4,
-        "target_cells": [[0, 0],[0, 2]],
-        "block_cells": [[0, 3],[1, 3],[2,3],[3,3],[0,1],[1,1],[2,1]],
-        "pieces": [
-          
-            {"color": "purple", "is_magnetic": true, "position": [3, 1]},
-          
-            {"color": "grey", "is_magnetic": false, "position": [1, 0]},
-            {"color": "grey", "is_magnetic": false, "position": [2, 0]},
-            {"color": "grey", "is_magnetic": false, "position": [1, 2]},
-            {"color": "grey", "is_magnetic": false, "position": [2, 2]}
-        ]
-    },
-    {
-        "board_size": 5,
-        "target_cells": [[0, 3],[1, 2],[2,3]],
-        "block_cells": [[3, 0],[3, 1],[3,2],[3,3],[3,4],[4,0],[4,1],[4,2],[4,3],[4,4]],
-        "pieces": [
-          
-            {"color": "purple", "is_magnetic": true, "position": [2, 0]},
-          
-            {"color": "grey", "is_magnetic": false, "position": [1, 1]},
-            {"color": "grey", "is_magnetic": false, "position": [1, 3]}
-        ]  
-    },
-    {
-        "board_size": 5,
-        "target_cells": [[0, 0],[2, 3],[4,4]],
-        "block_cells": [[0, 4],[1, 4],[2,4],[3,4],[4,4],[4,0],[4,1],[4,2]],
-        "pieces": [
-          
-            {"color": "purple", "is_magnetic": true, "position": [2, 1]},
-          
-            {"color": "grey", "is_magnetic": false, "position": [1, 0]},
-            {"color": "grey", "is_magnetic": false, "position": [2, 0]},
-            {"color": "grey", "is_magnetic": false, "position": [3, 1]},
-            {"color": "grey", "is_magnetic": false, "position": [3, 2]}
-        ]  
-    },
-    {
-        "board_size": 4,
-        "target_cells": [[0, 0],[0, 2],[2,2]],
-        "block_cells": [[0, 3],[1, 3],[2,3],[3,3]],
-        "pieces": [
-          
-            {"color": "purple", "is_magnetic": true, "position": [2, 0]},
-          
-            {"color": "grey", "is_magnetic": false, "position": [1, 1]},
-            {"color": "grey", "is_magnetic": false, "position": [1, 2]}
-        ]  
-    }, 
-    {
-        "board_size": 7,
-        "target_cells": [[0, 1],[0, 6]],
-        "block_cells": [[1,0],[1,1],[1,2],[1,3],[1,4],[1,5],[1,6],[2,0],[2,1],[2,2],[2,3],[2,4],[2,5],[2,6]],
-        "pieces": [
-          
-            {"color": "purple", "is_magnetic": true, "position": [0, 0]},
-          
-            {"color": "grey", "is_magnetic": false, "position": [0, 3]},
-            {"color": "grey", "is_magnetic": false, "position": [0, 5]}
-        ]  
-    },
-    {
-        "board_size": 4,
-        "target_cells": [[1, 1],[1, 3],[3,0],[3,3]],
-        "block_cells": [],
-        "pieces": [
-          
-            {"color": "purple", "is_magnetic": true, "position": [0, 0]},
-          
-            {"color": "grey", "is_magnetic": false, "position": [2, 2]},
-            {"color": "grey", "is_magnetic": false, "position": [2, 3]},
-             {"color": "grey", "is_magnetic": false, "position": [3, 1]}
-        ]  
-    },
-    {
-        "board_size": 5,
-        "target_cells": [[0, 1],[0, 3],[0,2]],
-        "block_cells": [[1,0],[1,1],[1,3],[1,4],[2,2]],
-        "pieces": [
-            {"color": "red", "is_magnetic": true, "position": [1, 2]},
-            
-            {"color": "grey", "is_magnetic": false, "position": [0, 0]},
-            {"color": "grey", "is_magnetic": false, "position": [0, 4]}
-        ]  
-    },
-    {
-        "board_size": 5,
-        "target_cells": [[2, 0],[1, 0],[4,0],[4,2]],
-        "block_cells": [[0,4],[1,4],[2,4],[3,4],[4,4],[0,2],[0,3],[1,2],[1,3]],
-        "pieces": [
-            {"color": "red", "is_magnetic": true, "position": [3, 1]},
-            
-            {"color": "grey", "is_magnetic": false, "position": [0, 0]},
-            {"color": "grey", "is_magnetic": false, "position": [1, 0]},
-             {"color": "grey", "is_magnetic": false, "position": [4, 3]}
-        ]  
-    },
-    {
-        "board_size": 6,
-        "target_cells": [[0, 3],[1, 1],[2,1]],
-        "block_cells": [[1,0],[2,0],[1,4],[1,5],[2,4],[2,5], [3,0],[3,1],[3,2],[3,3],[3,4],[3,5]],
-        "pieces": [
-            {"color": "red", "is_magnetic": true, "position": [2, 3]},
-            
-            {"color": "grey", "is_magnetic": false, "position": [0, 0]},
-            {"color": "grey", "is_magnetic": false, "position": [0, 4]},
-             {"color": "grey", "is_magnetic": false, "position": [0, 5]}
-        ]  
-    },
-    {
-        "board_size": 4,
-        "target_cells": [[1, 0],[1, 2],[2,1],[2,2]],
-        "block_cells": [],
-        "pieces": [
-            {"color": "red", "is_magnetic": true, "position": [3, 3]},
-            
-            {"color": "grey", "is_magnetic": false, "position": [0, 3]},
-            {"color": "grey", "is_magnetic": false, "position": [2, 0]},
-             {"color": "grey", "is_magnetic": false, "position": [3, 0]}
-        ]  
-    },
-    {
-        "board_size": 5,
-        "target_cells": [[0, 0],[0, 2],[1,4],[2,4]],
-        "block_cells": [[3,0],[3,1],[3,2],[3,3],[3,4]],
-        "pieces": [
-            {"color": "red", "is_magnetic": true, "position": [2, 2]},
-            
-            {"color": "grey", "is_magnetic": false, "position": [0, 1]},
-            {"color": "grey", "is_magnetic": false, "position": [0, 3]},
-             {"color": "purple", "is_magnetic": true, "position": [1, 2]}
-        ]  
-    }
-]
+            {"piece_type": "repulsive", "position": [4, 0]},
+            {"piece_type": "iron", "position": [2, 1],},
+            {"piece_type": "iron", "position": [3, 2],},
+            {"piece_type": "iron", "position": [1, 2],},
+            {"piece_type": "iron", "position": [2, 3],}
 
+        ]
+    },
+]
 
 # Start the game
 if __name__ == "__main__":
