@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 class Piece:
     def __init__(self, piece_type, position):
         """Initialize piece with its type and position."""
@@ -129,14 +130,23 @@ class Board:
                 return False
         return True 
 
+=======
+from board import Board, Piece 
+>>>>>>> main
 
 class Level:
     def __init__(self, level_data):
         """Initialize a level using provided level data."""
         self.board_size = level_data['board_size']
         self.target_cells = [(x[0], x[1]) for x in level_data['target_cells']]
+<<<<<<< HEAD
         self.pieces = level_data['pieces']
         self.board = Board(self.board_size, self.target_cells, pieces=self.pieces)
+=======
+        self.block_cells = [(x[0], x[1]) for x in level_data['block_cells']]
+        self.pieces = level_data['pieces']
+        self.board = Board(self.board_size, self.target_cells, blocks=self.block_cells, pieces=self.pieces)
+>>>>>>> main
 
     def start(self):
         """Start the level."""
@@ -199,6 +209,7 @@ class Game:
                 self.levels[choice].start()
             else:
                 print("Invalid level choice. Please try again.")
+<<<<<<< HEAD
 
 
 # Sample levels data
@@ -229,3 +240,5 @@ levels_data = [
 if __name__ == "__main__":
     game = Game(levels_data)
     game.choose_level()
+=======
+>>>>>>> main
