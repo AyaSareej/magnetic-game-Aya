@@ -1,3 +1,6 @@
+from collections import deque
+
+
 class Piece:
     def __init__(self, piece_type, position):
         """Initialize piece with its type and position."""
@@ -33,6 +36,82 @@ class Board:
         # Add blocks to the board
         for block in self.blocks:
             self.add_block(block[0], block[1])
+
+
+        # 
+        # BFS
+        # 
+
+    def bfs_solve(self):
+            """Solve the game using BFS and return the sequence of moves."""
+            initial_state = self.get_state()
+            queue = deque([(initial_state, [])])  # (state, moves)
+            visited = set()
+            visited.add(initial_state)
+
+            while queue:
+                current_state, moves = queue.popleft()
+                self.set_state(current_state)
+
+                if self.check_win_condition():
+                    return moves  # Return the sequence of moves leading to the solution
+
+                # Generate all possible moves from the current state
+                for piece, valid_moves in self.get_all_valid_moves().items():
+                    for move in valid_moves:
+                        new_state = self.simulate_move(piece, move)
+                        if new_state not in visited:
+                            visited.add(new_state)
+                            queue.append((new_state, moves + [(piece, move)]))
+
+            return None  # No solution found
+
+    def get_state(self):
+        """Get a tuple representing the current state of the board."""
+        return tuple((piece.piece_type, tuple(piece.position)) for piece in self.pieces)
+
+    def set_state(self, state):
+        """Set the board to a specific state."""
+        self.grid = [[None for _ in range(self.size)] for _ in range(self.size)]
+        self.pieces = []
+        for piece_type, position in state:
+            piece = Piece(piece_type, list(position))
+            self.add_piece(piece, position[0], position[1])
+
+    def get_all_valid_moves(self):
+        """Get all valid moves for all pieces."""
+        valid_moves = {}
+        for piece in self.pieces:
+            if piece.piece_type == "iron":  # Iron pieces cannot be moved manually
+                continue
+            valid_moves[piece] = self.get_valid_moves_for_piece(piece)
+        return valid_moves
+
+    def get_valid_moves_for_piece(self, piece):
+        """Get all valid moves for a specific piece."""
+        x, y = piece.position
+        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]  # Up, Down, Left, Right
+        valid_moves = []
+
+        for dx, dy in directions:
+            new_x, new_y = x + dx, y + dy
+            if self.can_move_piece(x, y, new_x, new_y):
+                valid_moves.append((new_x, new_y))
+
+        return valid_moves
+
+    def simulate_move(self, piece, move):
+        """Simulate a move and return the resulting state."""
+        x, y = piece.position
+        new_x, new_y = move
+        self.move_piece(x, y, new_x, new_y)
+        return self.get_state()
+
+
+
+            # 
+            # 
+            # 
 
     def move_adjacent_pieces_towards(self, new_position):
         """Pull adjacent pieces towards the attractive piece."""
