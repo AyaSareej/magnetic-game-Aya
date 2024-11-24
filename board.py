@@ -1,5 +1,5 @@
 from collections import deque
-
+from bfs import BFSAlgorithm
 
 class Piece:
     def __init__(self, piece_type, position):
@@ -37,55 +37,64 @@ class Board:
         for block in self.blocks:
             self.add_block(block[0], block[1])
 
+        # for algorithms
+        self.states = []
+        self.save_state()
 
         # 
-        # BFS
+        # in board class
         # 
-
-    def bfs_solve(self):
-            """Solve the game using BFS and return the sequence of moves."""
-            initial_state = self.get_state()
-            queue = deque([(initial_state, [])])  # (state, moves)
-            visited = set()
-            visited.add(initial_state)
-
-            while queue:
-                current_state, moves = queue.popleft()
-                self.set_state(current_state)
-
-                if self.check_win_condition():
-                    return moves  # Return the sequence of moves leading to the solution
-
-                # Generate all possible moves from the current state
-                for piece, valid_moves in self.get_all_valid_moves().items():
-                    for move in valid_moves:
-                        new_state = self.simulate_move(piece, move)
-                        if new_state not in visited:
-                            visited.add(new_state)
-                            queue.append((new_state, moves + [(piece, move)]))
-
-            return None  # No solution found
+    def get_grid(self):
+            """Returns the current grid state."""
+            return self.grid
+    
+    def all_targets_filled(self):
+        """Check if all target positions are occupied by valid pieces."""
+        for x, y in self.targets:
+            piece = self.grid[x][y]
+            if piece is None or not isinstance(piece, Piece):  # Ensure a valid piece is present
+                return False
+        return True
 
     def get_state(self):
-        """Get a tuple representing the current state of the board."""
-        return tuple((piece.piece_type, tuple(piece.position)) for piece in self.pieces)
+        """
+        Get a hashable representation of the board's current state.
+        Includes grid, pieces, blocks, and target positions.
+        """
+        # Capture grid state
+        grid_state = tuple(tuple(cell for cell in row) for row in self.grid)
 
+        # Capture piece states
+        pieces_state = tuple(sorted((piece.piece_type, tuple(piece.position)) for piece in self.pieces))
+
+        # Include block and target positions
+        blocks_state = tuple(sorted(self.blocks))
+        targets_state = tuple(sorted(self.targets))
+
+        return (grid_state, pieces_state, blocks_state, targets_state)
+
+
+    def save_state(self):
+        grid_copy = [row[:] for row in self.grid]
+        self.states.append(grid_copy)
+
+    def has_reached_state(self, grid):
+        return any(grid == state for state in self.states)
+    
     def set_state(self, state):
-        """Set the board to a specific state."""
-        self.grid = [[None for _ in range(self.size)] for _ in range(self.size)]
-        self.pieces = []
-        for piece_type, position in state:
-            piece = Piece(piece_type, list(position))
-            self.add_piece(piece, position[0], position[1])
+        """Restore the board and pieces from a given state."""
+        board_state, piece_state = state
 
-    def get_all_valid_moves(self):
-        """Get all valid moves for all pieces."""
-        valid_moves = {}
+        # Reset grid
+        self.grid = [list(row) for row in board_state]
+
+        # Reset pieces
         for piece in self.pieces:
-            if piece.piece_type == "iron":  # Iron pieces cannot be moved manually
-                continue
-            valid_moves[piece] = self.get_valid_moves_for_piece(piece)
-        return valid_moves
+            for piece_type, position in piece_state:
+                if piece.piece_type == piece_type:
+                    piece.position = list(position)
+                    x, y = position
+                    self.grid[x][y] = piece
 
     def get_valid_moves_for_piece(self, piece):
         """Get all valid moves for a specific piece."""
@@ -100,12 +109,119 @@ class Board:
 
         return valid_moves
 
-    def simulate_move(self, piece, move):
-        """Simulate a move and return the resulting state."""
-        x, y = piece.position
-        new_x, new_y = move
-        self.move_piece(x, y, new_x, new_y)
-        return self.get_state()
+
+#
+#
+#
+    # def get_state(self):
+    #     """
+    #     Get the current state of the board and pieces.
+    #     This will be a tuple containing:
+    #     - A tuple for each piece (type, position).
+    #     - A tuple for all blocks (to differentiate states with blocks).
+    #     - A tuple for the targets (to differentiate by target setup).
+    #     """
+    #     pieces_state = tuple((piece.piece_type, tuple(piece.position)) for piece in self.pieces)
+    #     blocks_state = tuple(sorted(self.blocks))  # Sort to make it hashable
+    #     targets_state = tuple(sorted(self.targets))  # Sort to make it hashable
+    #     return (pieces_state, blocks_state, targets_state)
+
+    # def set_state(self, state):
+    #     """
+    #     Restore the board to a specific state.
+    #     Input `state` is a tuple containing:
+    #     - A tuple for each piece (type, position).
+    #     - A tuple for all blocks.
+    #     - A tuple for the targets.
+    #     """
+    #     pieces_state, blocks_state, targets_state = state
+
+    #     # Reset the grid and pieces
+    #     self.grid = [[None for _ in range(self.size)] for _ in range(self.size)]
+    #     self.pieces = []
+    #     self.blocks = list(blocks_state)
+    #     self.targets = list(targets_state)
+
+    #     # Add pieces back to the grid
+    #     for piece_type, position in pieces_state:
+    #         piece = Piece(piece_type, list(position))
+    #         self.add_piece(piece, position[0], position[1])
+
+    #     # Add blocks to the grid
+    #     for block in self.blocks:
+    #         self.add_block(block[0], block[1])
+
+    
+    # def is_valid_move(self, piece, new_pos):
+    #         x, y = new_pos
+    #         return (0 <= x < self.board_size and 
+    #                 0 <= y < self.board_size and 
+    #                 self.board[x][y] is None)
+    
+    # def find_piece_by_type(self, piece_type, position):
+    #     """Find a piece by its type and position."""
+    #     for piece in self.pieces:
+    #         if piece.piece_type == piece_type and tuple(piece.position) == position:
+    #             return piece
+    #     return None
+
+
+
+    # def get_all_valid_moves(self):
+    #     """Get all valid moves for all pieces."""
+    #     valid_moves = {}
+    #     for piece in self.pieces:
+    #         if piece.piece_type == "iron":  # Iron pieces cannot be moved manually
+    #             continue
+    #         valid_moves[piece] = self.get_valid_moves_for_piece(piece)
+    #     return valid_moves
+
+    # def get_valid_moves_for_piece(self, piece):
+    #     """Get all valid moves for a specific piece."""
+    #     x, y = piece.position
+    #     directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]  # Up, Down, Left, Right
+    #     valid_moves = []
+
+    #     for dx, dy in directions:
+    #         new_x, new_y = x + dx, y + dy
+    #         if self.can_move_piece(x, y, new_x, new_y):
+    #             valid_moves.append((new_x, new_y))
+
+    #     return valid_moves
+
+    # def simulate_move(self, piece, move):
+    #     """Simulate a move and return the resulting state."""
+    #     x, y = piece.position
+    #     new_x, new_y = move
+
+    #     # Temporarily apply the move
+    #     original_grid = [row[:] for row in self.grid]  # Copy grid
+    #     original_position = piece.position[:]
+
+    #     self.move_piece(x, y, new_x, new_y)
+    #     new_state = self.get_state()
+
+    #     # Revert to the original state
+    #     self.grid = original_grid
+    #     piece.position = original_position
+
+    #     return new_state
+
+    # def check_win_condition(self):
+    #     """Check if all target positions are occupied by pieces."""
+    #     for (x, y) in self.targets:
+    #         piece = self.grid[x][y]
+    #         if piece is None or not isinstance(piece, Piece):
+    #             return False
+    #     return True
+
+    
+    # def find_piece_by_type(self, piece_type, position):
+    #     """Find a piece by its type and position."""
+    #     for piece in self.pieces:
+    #         if piece.piece_type == piece_type and tuple(piece.position) == position:
+    #             return piece
+    #     return None
 
 
 
@@ -248,11 +364,13 @@ class Board:
         """Add a block to the board at position (x, y)."""
         if 0 <= x < self.size and 0 <= y < self.size:
             self.grid[x][y] = 'X'  # Mark the block position
+            print(f"Block added at ({x}, {y})")  # Debugging output
         else:
             print("Block position is out of the game boundaries")
 
+
     def display_board(self):
-        """Display the grid state for the user, marking targets with 'T' if empty."""
+        """Display the grid state for the user, marking targets with 'T' if empty and blocks with 'X'."""
         print("Grid game state:")
         print("    " + "  ".join([str(i) for i in range(self.size)]))
         print(" +" + "---" * self.size + "+")
@@ -260,16 +378,23 @@ class Board:
         for i, row in enumerate(self.grid):
             row_display = f"{i}| "
             for j, cell in enumerate(row):
-                if cell is None:
-                    row_display += " T " if (i, j) in self.targets else " . "
-                elif cell == 'X':
-                    row_display += " X "  # Display block as 'X'
+                if (i, j) in self.targets and cell is None:
+                    # Show target 'T' if it is empty
+                    row_display += " T "
+                elif (i, j) in self.blocks:
+                    # Show block 'X'
+                    row_display += " X "
+                elif cell is None:
+                    # Show empty cell
+                    row_display += " . "
                 else:
-                    row_display += f" {cell} "  # Display piece type
+                    # Show the piece (e.g., 'I', 'R', 'A')
+                    row_display += f" {cell} "
             row_display += "|"
             print(row_display)
 
         print(" +" + "---" * self.size + "+")
+
 
     def is_within_bounds(self, x, y):
         """Check if the coordinates are within the board boundaries."""
@@ -339,6 +464,8 @@ class Board:
             self.move_adjacent_pieces_towards((new_x, new_y))
         elif piece.piece_type == "repulsive":
             self.move_adjacent_pieces_away((new_x, new_y))
+
+        self.save_state()
 
         return True
         
