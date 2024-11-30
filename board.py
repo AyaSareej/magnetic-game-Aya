@@ -1,6 +1,3 @@
-from collections import deque
-from bfs import BFSAlgorithm
-
 class Piece:
     def __init__(self, piece_type, position):
         """Initialize piece with its type and position."""
@@ -23,7 +20,7 @@ class Board:
     def __init__(self, size, targets=None, blocks=None, pieces=None):
         self.size = size
         self.grid = [[None for _ in range(size)] for _ in range(size)]  # 2D grid initialization
-        self.targets = targets if targets else []  # List of target positions (goal spots)
+        self.targets = [tuple(target) for target in targets] if targets else []  # Convert to tuples
         self.blocks = blocks if blocks else []  # List of block positions
         self.pieces = []  # Track all pieces for easy access
 
@@ -106,8 +103,10 @@ class Board:
             new_x, new_y = x + dx, y + dy
             if self.can_move_piece(x, y, new_x, new_y):
                 valid_moves.append((new_x, new_y))
+                print(f"Valid move found for {piece} to ({new_x}, {new_y})")  # Debugging output
 
         return valid_moves
+
 
 
 #
@@ -364,7 +363,7 @@ class Board:
         """Add a block to the board at position (x, y)."""
         if 0 <= x < self.size and 0 <= y < self.size:
             self.grid[x][y] = 'X'  # Mark the block position
-            print(f"Block added at ({x}, {y})")  # Debugging output
+            # print(f"Block added at ({x}, {y})")  # Debugging output
         else:
             print("Block position is out of the game boundaries")
 
@@ -449,25 +448,26 @@ class Board:
                         target_piece.position = [target_new_x, target_new_y]
 
     def move_piece(self, x, y, new_x, new_y):
-        """Move the piece from (x, y) to (new_x, new_y) if valid."""
         if not self.can_move_piece(x, y, new_x, new_y):
-            print("Move is not allowed.")
+            print("Invalid move.")
             return False
 
         piece = self.grid[x][y]
+        self.grid[x][y] = None
         self.grid[new_x][new_y] = piece
-        self.grid[x][y] = None  # Clear original position of the piece
-        piece.position = [new_x, new_y]  # Update piece's internal position
+        piece.position = [new_x, new_y]
 
-        # Apply magnetic effects based on piece type
+        print(f"Piece {piece} moved from ({x}, {y}) to ({new_x}, {new_y})")  # Debugging
+
+        # Apply magnetic effects
         if piece.piece_type == "attractive":
             self.move_adjacent_pieces_towards((new_x, new_y))
         elif piece.piece_type == "repulsive":
             self.move_adjacent_pieces_away((new_x, new_y))
 
         self.save_state()
-
         return True
+
         
     def move_piece_to(self, current_position, new_position):
         """Helper method to move a piece to a new position."""

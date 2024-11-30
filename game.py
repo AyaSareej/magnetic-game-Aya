@@ -1,6 +1,8 @@
 from board import Board
 from bfs import BFSAlgorithm
-from ucs import UCSAlgorithm  # Import UCS Algorithm
+from ucs import UCSAlgorithm
+from HillClimbing import HillClimbingAlgorithm
+from dfs import DFSAlgorithm  # Import the DFS algorithm
 
 
 class Game:
@@ -32,17 +34,51 @@ class Level:
     def start(self):
         """Start the level."""
         print(f"Starting Level with board size {self.board_size}")
-        solve_method = input("Do you want to (M)anually solve the game, use (B)FS, or (U)CS to solve? (M/B/U): ").strip().upper()
+        solve_method = input("Do you want to (M)anually solve the game, use (B)FS, (U)CS, (H)ill Climbing, or (D)FS to solve? (M/B/U/H/D): ").strip().upper()
 
         if solve_method in ["B", "BFS"]:
             self.solve_with_bfs()
         elif solve_method in ["U", "UCS"]:
             self.solve_with_ucs()
+        elif solve_method in ["H", "HILL"]:
+            self.solve_with_hill_climbing()
+        elif solve_method in ["D", "DFS"]:
+            self.solve_with_dfs()
         elif solve_method == "M":
             self.play()
         else:
             print("Invalid choice. Defaulting to manual mode.")
             self.play()
+
+    def solve_with_dfs(self):
+        """Solve the level using DFS."""
+        print("Solving level using DFS...")
+        dfs_solver = DFSAlgorithm(self.board)
+        moves = dfs_solver.solve()
+        if moves:
+            print("Solution found!")
+            for i, (piece, move) in enumerate(moves):
+                print(f"Step {i + 1}: Move {piece} to {move}")
+            for piece, move in moves:
+                self.board.move_piece(piece.position[0], piece.position[1], move[0], move[1])
+                self.board.display_board()  # Show the board state after each move
+        else:
+            print("No solution found.")
+
+    def solve_with_hill_climbing(self):
+        """Solve the level using Hill Climbing."""
+        print("Solving level using Hill Climbing...")
+        hill_solver = HillClimbingAlgorithm(self.board)
+        moves = hill_solver.solve()
+        if moves:
+            print("Solution found!")
+            for i, (piece, move) in enumerate(moves):
+                print(f"Step {i + 1}: Move {piece} to {move}")
+            for piece, move in moves:
+                self.board.move_piece(piece.position[0], piece.position[1], move[0], move[1])
+                self.board.display_board()
+        else:
+            print("No solution found.")
 
     def solve_with_ucs(self):
         """Solve the level using UCS."""
@@ -53,11 +89,9 @@ class Level:
             print("Solution found!")
             for i, (piece, move) in enumerate(moves):
                 print(f"Step {i + 1}: Move {piece} to {move}")
-            # Apply moves to visualize solution
             for piece, move in moves:
                 self.board.move_piece(piece.position[0], piece.position[1], move[0], move[1])
                 self.board.display_board()  # Show the board state after each move
- 
 
     def solve_with_bfs(self):
         """Solve the level using BFS."""
@@ -68,13 +102,11 @@ class Level:
             print("Solution found!")
             for i, (piece, move) in enumerate(moves):
                 print(f"Step {i + 1}: Move {piece} to {move}")
-            # Apply moves to visualize solution
             for piece, move in moves:
                 self.board.move_piece(piece.position[0], piece.position[1], move[0], move[1])
                 self.board.display_board()  # Show the board state after each move
         else:
             print("No solution found.")
-
 
     def play(self):
         """Manual game loop for the player."""
