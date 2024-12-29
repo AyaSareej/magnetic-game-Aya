@@ -1,11 +1,9 @@
 class Piece:
     def __init__(self, piece_type, position):
-        """Initialize piece with its type and position."""
-        self.piece_type = piece_type  # 'repulsive', 'iron', etc.
-        self.position = position  # [x, y]
+        self.piece_type = piece_type 
+        self.position = position 
 
     def __str__(self):
-        """Display 'R' for repulsive, 'I' for iron, etc."""
         if self.piece_type == "repulsive":
             return "R"
         elif self.piece_type == "iron":
@@ -15,24 +13,22 @@ class Piece:
         return "?"
 
 
-
 class Board:
     def __init__(self, size, targets=None, blocks=None, pieces=None):
         self.size = size
-        self.grid = [[None for _ in range(size)] for _ in range(size)]  # 2D grid initialization
-        self.targets = [tuple(target) for target in targets] if targets else []  # Convert to tuples
-        self.blocks = blocks if blocks else []  # List of block positions
-        self.pieces = []  # Track all pieces for easy access
-
-        # Initialize pieces on the board
-        if pieces:
-            for piece_data in pieces:
-                piece = Piece(piece_data['piece_type'], piece_data['position'])
-                self.add_piece(piece, piece_data['position'][0], piece_data['position'][1])
+        self.grid = [[None for _ in range(size)] for _ in range(size)]  
+        self.targets = [tuple(target) for target in targets] if targets else []  
+        self.blocks = [tuple(block) for block in blocks] if blocks else []  
+        self.pieces = []  
 
         # Add blocks to the board
         for block in self.blocks:
             self.add_block(block[0], block[1])
+
+        if pieces:
+            for piece_data in pieces:
+                piece = Piece(piece_data['piece_type'], piece_data['position'])
+                self.add_piece(piece, piece_data['position'][0], piece_data['position'][1])
 
         # for algorithms
         self.states = []
@@ -42,261 +38,192 @@ class Board:
         # in board class
         # 
     def get_grid(self):
-            """Returns the current grid state."""
             return self.grid
     
-    def all_targets_filled(self):
-        """Check if all target positions are occupied by valid pieces."""
-        for x, y in self.targets:
-            piece = self.grid[x][y]
-            if piece is None or not isinstance(piece, Piece):  # Ensure a valid piece is present
-                return False
-        return True
 
-    def get_state(self):
-        """
-        Get a hashable representation of the board's current state.
-        Includes grid, pieces, blocks, and target positions.
-        """
-        # Capture grid state
-        grid_state = tuple(tuple(cell for cell in row) for row in self.grid)
+    # Adding pieces
+    def add_piece(self, piece, x, y):
+        if 0 <= x < self.size and 0 <= y < self.size:
+            self.grid[x][y] = piece
+            self.pieces.append(piece)
+        else:
+            print("Position is out of the game boundaries")
 
-        # Capture piece states
-        pieces_state = tuple(sorted((piece.piece_type, tuple(piece.position)) for piece in self.pieces))
+    def add_block(self, x, y):
+        if 0 <= x < self.size and 0 <= y < self.size:
+            self.grid[x][y] = 'X'  
+        else:
+            print("Block position is out of the game boundaries")
 
-        # Include block and target positions
-        blocks_state = tuple(sorted(self.blocks))
-        targets_state = tuple(sorted(self.targets))
-
-        return (grid_state, pieces_state, blocks_state, targets_state)
-
-
+    # about the state
     def save_state(self):
         grid_copy = [row[:] for row in self.grid]
         self.states.append(grid_copy)
 
-    def has_reached_state(self, grid):
-        return any(grid == state for state in self.states)
+    def get_state(self):
+        grid_state = tuple(
+            tuple(str(cell) if cell is not None else "empty" for cell in row)
+            for row in self.grid
+        )
+        pieces_state = tuple(
+            sorted((piece.piece_type, tuple(piece.position)) for piece in self.pieces)
+        )
+        blocks_state = tuple(sorted(self.blocks))  # Include block positions
+        targets_state = tuple(sorted(self.targets))  
+
+        return (grid_state, pieces_state, blocks_state, targets_state)
+
+
+    # Conditions
+    def is_within_bounds(self, x, y):
+        return 0 <= x < self.size and 0 <= y < self.size
+
+    def can_move_piece(self, x, y, new_x, new_y):
+        if not self.is_within_bounds(x, y) or not self.is_within_bounds(new_x, new_y):
+            print("Move out of bounds.")
+            return False
+
+        piece = self.grid[x][y]
+        if piece is None:
+            print("No piece at starting position.")
+            return False
+
+        if piece.piece_type == "iron":
+            print("Iron pieces cannot be moved manually.")
+            return False
+
+        if self.grid[new_x][new_y] is not None:
+            print("Target cell is occupied.")
+            return False
+        
+        if self.grid[new_x][new_y] == 'X':
+            print("Cannot move to a block cell.")
+            return False
+
+        return True
+
+    def can_repel_piece(self, piece, target_x, target_y):
+        if self.grid[target_x][target_y] == 'X':
+            print("Cannot repel due to a block cell.")
+            return False
+        return True
+
+    def all_targets_filled(self):
+        for x, y in self.targets:
+            piece = self.grid[x][y]
+            if piece is None or not isinstance(piece, Piece):  # if there wasn't a piece, or the piece is not a pice type (I, R, A) => the target is not correct
+                return False
+        return True
+
+    def check_win_condition(self):
+        for (x, y) in self.targets:
+            if self.grid[x][y] is None:
+                return False
+        return True 
+
     
-    def set_state(self, state):
-        """Restore the board and pieces from a given state."""
-        board_state, piece_state = state
-
-        # Reset grid
-        self.grid = [list(row) for row in board_state]
-
-        # Reset pieces
-        for piece in self.pieces:
-            for piece_type, position in piece_state:
-                if piece.piece_type == piece_type:
-                    piece.position = list(position)
-                    x, y = position
-                    self.grid[x][y] = piece
-
+    # Moving the pieces
     def get_valid_moves_for_piece(self, piece):
-        """Get all valid moves for a specific piece."""
         x, y = piece.position
-        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]  # Up, Down, Left, Right
+        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)] 
         valid_moves = []
 
         for dx, dy in directions:
             new_x, new_y = x + dx, y + dy
             if self.can_move_piece(x, y, new_x, new_y):
                 valid_moves.append((new_x, new_y))
-                print(f"Valid move found for {piece} to ({new_x}, {new_y})")  # Debugging output
+                print(f"Valid move found for {piece} to ({new_x}, {new_y})")  
 
         return valid_moves
 
+    def move_piece(self, x, y, new_x, new_y):
+        if not self.can_move_piece(x, y, new_x, new_y): 
+            # to see if i can move the piece or not
+            print("Invalid move.")
+            return False
 
+        piece = self.grid[x][y]
+        self.grid[x][y] = None
+        self.grid[new_x][new_y] = piece # putting the piece in its new position
+        piece.position = [new_x, new_y] # making the piece know its new position
 
-#
-#
-#
-    # def get_state(self):
-    #     """
-    #     Get the current state of the board and pieces.
-    #     This will be a tuple containing:
-    #     - A tuple for each piece (type, position).
-    #     - A tuple for all blocks (to differentiate states with blocks).
-    #     - A tuple for the targets (to differentiate by target setup).
-    #     """
-    #     pieces_state = tuple((piece.piece_type, tuple(piece.position)) for piece in self.pieces)
-    #     blocks_state = tuple(sorted(self.blocks))  # Sort to make it hashable
-    #     targets_state = tuple(sorted(self.targets))  # Sort to make it hashable
-    #     return (pieces_state, blocks_state, targets_state)
+        print(f"Piece {piece} moved from ({x}, {y}) to ({new_x}, {new_y})")  # Debugging
 
-    # def set_state(self, state):
-    #     """
-    #     Restore the board to a specific state.
-    #     Input `state` is a tuple containing:
-    #     - A tuple for each piece (type, position).
-    #     - A tuple for all blocks.
-    #     - A tuple for the targets.
-    #     """
-    #     pieces_state, blocks_state, targets_state = state
+        # Apply magnetic effects
+        if piece.piece_type == "attractive":
+            self.move_adjacent_pieces_towards((new_x, new_y))
+        elif piece.piece_type == "repulsive":
+            self.move_adjacent_pieces_away((new_x, new_y))
 
-    #     # Reset the grid and pieces
-    #     self.grid = [[None for _ in range(self.size)] for _ in range(self.size)]
-    #     self.pieces = []
-    #     self.blocks = list(blocks_state)
-    #     self.targets = list(targets_state)
-
-    #     # Add pieces back to the grid
-    #     for piece_type, position in pieces_state:
-    #         piece = Piece(piece_type, list(position))
-    #         self.add_piece(piece, position[0], position[1])
-
-    #     # Add blocks to the grid
-    #     for block in self.blocks:
-    #         self.add_block(block[0], block[1])
-
+        self.save_state()
+        return True
     
-    # def is_valid_move(self, piece, new_pos):
-    #         x, y = new_pos
-    #         return (0 <= x < self.board_size and 
-    #                 0 <= y < self.board_size and 
-    #                 self.board[x][y] is None)
-    
-    # def find_piece_by_type(self, piece_type, position):
-    #     """Find a piece by its type and position."""
-    #     for piece in self.pieces:
-    #         if piece.piece_type == piece_type and tuple(piece.position) == position:
-    #             return piece
-    #     return None
-
-
-
-    # def get_all_valid_moves(self):
-    #     """Get all valid moves for all pieces."""
-    #     valid_moves = {}
-    #     for piece in self.pieces:
-    #         if piece.piece_type == "iron":  # Iron pieces cannot be moved manually
-    #             continue
-    #         valid_moves[piece] = self.get_valid_moves_for_piece(piece)
-    #     return valid_moves
-
-    # def get_valid_moves_for_piece(self, piece):
-    #     """Get all valid moves for a specific piece."""
-    #     x, y = piece.position
-    #     directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]  # Up, Down, Left, Right
-    #     valid_moves = []
-
-    #     for dx, dy in directions:
-    #         new_x, new_y = x + dx, y + dy
-    #         if self.can_move_piece(x, y, new_x, new_y):
-    #             valid_moves.append((new_x, new_y))
-
-    #     return valid_moves
-
-    # def simulate_move(self, piece, move):
-    #     """Simulate a move and return the resulting state."""
-    #     x, y = piece.position
-    #     new_x, new_y = move
-
-    #     # Temporarily apply the move
-    #     original_grid = [row[:] for row in self.grid]  # Copy grid
-    #     original_position = piece.position[:]
-
-    #     self.move_piece(x, y, new_x, new_y)
-    #     new_state = self.get_state()
-
-    #     # Revert to the original state
-    #     self.grid = original_grid
-    #     piece.position = original_position
-
-    #     return new_state
-
-    # def check_win_condition(self):
-    #     """Check if all target positions are occupied by pieces."""
-    #     for (x, y) in self.targets:
-    #         piece = self.grid[x][y]
-    #         if piece is None or not isinstance(piece, Piece):
-    #             return False
-    #     return True
-
-    
-    # def find_piece_by_type(self, piece_type, position):
-    #     """Find a piece by its type and position."""
-    #     for piece in self.pieces:
-    #         if piece.piece_type == piece_type and tuple(piece.position) == position:
-    #             return piece
-    #     return None
-
-
-
-            # 
-            # 
-            # 
+    def move_piece_to(self, current_position, new_position):
+        if self.is_within_bounds(new_position[0], new_position[1]) and self.grid[new_position[0]][new_position[1]] is None:
+            piece = self.grid[current_position[0]][current_position[1]]
+            if isinstance(piece, Piece):
+                self.grid[current_position[0]][current_position[1]] = None
+                piece.position = [new_position[0], new_position[1]]
+                self.grid[new_position[0]][new_position[1]] = piece
 
     def move_adjacent_pieces_towards(self, new_position):
-        """Pull adjacent pieces towards the attractive piece."""
         x, y = new_position
 
-        # Check and move pieces from left
         for j in range(y-1, -1, -1):
             piece = self.grid[x][j]
             if piece != None and isinstance(piece, Piece):
                 self.move_piece_to((x,j), (x,j+1))
 
-        # Check and move pieces from right
         for j in range(y + 1, self.size):
             piece = self.grid[x][j]
             if piece != None and isinstance(piece, Piece):
                 self.move_piece_to((x, j), (x, j-1))
 
-        # Check and move pieces from above
         for i in range(x-1, -1, -1):
             piece = self.grid[i][y]
             if piece != None and isinstance(piece, Piece):
                 self.move_piece_to((i,y), (i+1, y))
 
-        # Check and move pieces from below
         for i in range(x+1, self.size):
             piece = self.grid[i][y]
             if piece != None and isinstance(piece, Piece):
                 self.move_piece_to((i, y), (i-1, y))
     
     def move_adjacent_pieces_away(self, new_position):
-        """Push adjacent pieces away from the repulsive piece."""
         directions = ["up", "down", "left", "right"]
         
         for direction in directions:
             x, y = new_position
+            
             while True:
                 x1, y1 = x, y
-
-                if direction == "up":
-                    x -= 1
-                elif direction == "down":
-                    x += 1
-                elif direction == "left":
-                    y -= 1
-                elif direction == "right":
-                    y += 1
+                x, y = self.move_position(x, y, direction)
 
                 if not self.is_within_bounds(x, y):
                     break
 
-                if self.grid[x][y] is not None and self.grid[x][y] != 'X':
+                if self.grid[x][y] is not None and self.grid[x][y] != 'X': # if there is a piece and that piece is not a block 'X'
                     connected_pieces = self.get_connected_pieces((x1, y1), direction)
                     if connected_pieces:
-                        self.move_connected_pieces_away((x1, y1), direction)
+                        self.move_connected_pieces_away(connected_pieces, direction)
                     break
-    
+
+    def move_position(self, x, y, direction):
+        if direction == "up":
+            return x - 1, y
+        elif direction == "down":
+            return x + 1, y
+        elif direction == "left":
+            return x, y - 1
+        elif direction == "right":
+            return x, y + 1
+        
     def get_connected_pieces(self, start_position, direction):
-        """Get list of connected pieces in a direction."""
         connected = []
         x, y = start_position
         
         while True:
-            if direction == "up":
-                x -= 1
-            elif direction == "down":
-                x += 1
-            elif direction == "left":
-                y -= 1
-            elif direction == "right":
-                y += 1
+            x, y = self.move_position(x, y, direction)
 
             if not self.is_within_bounds(x, y) or self.grid[x][y] is None:
                 break
@@ -304,10 +231,8 @@ class Board:
             connected.append((x, y))
             
         return connected
-    
-    def move_connected_pieces_away(self, start_position, direction):
-        """Move connected pieces away from the repulsive piece."""
-        connected_pieces = self.get_connected_pieces(start_position, direction)
+   
+    def move_connected_pieces_away(self, connected_pieces, direction):
         if not connected_pieces:
             return False
 
@@ -315,14 +240,7 @@ class Board:
         lx, ly = last_piece_pos
 
         # Calculate the position after the last piece
-        if direction == "up":
-            after_position = (lx-1, ly)
-        elif direction == "down":
-            after_position = (lx+1, ly)
-        elif direction == "left":
-            after_position = (lx, ly-1)
-        elif direction == "right":
-            after_position = (lx, ly+1)
+        after_position = self.move_position(lx, ly, direction)
 
         # Move pieces if possible
         if self.is_within_bounds(after_position[0], after_position[1]) and self.grid[after_position[0]][after_position[1]] is None:
@@ -332,17 +250,8 @@ class Board:
         return False
 
     def move_piece_away(self, current_position, direction):
-        """Move a single piece away in the specified direction."""
         cx, cy = current_position
-        
-        if direction == "up":
-            new_position = (cx-1, cy)
-        elif direction == "down":
-            new_position = (cx+1, cy)
-        elif direction == "left":
-            new_position = (cx, cy-1)
-        elif direction == "right":
-            new_position = (cx, cy+1)
+        new_position = self.move_position(cx, cy, direction)
 
         if self.is_within_bounds(new_position[0], new_position[1]) and self.grid[new_position[0]][new_position[1]] is None:
             piece = self.grid[cx][cy]
@@ -351,22 +260,16 @@ class Board:
                 piece.position = [new_position[0], new_position[1]]
                 self.grid[new_position[0]][new_position[1]] = piece
 
-    def add_piece(self, piece, x, y):
-        """Add a piece to the board at position (x, y)."""
-        if 0 <= x < self.size and 0 <= y < self.size:
-            self.grid[x][y] = piece
-            self.pieces.append(piece)
-        else:
-            print("Position is out of the game boundaries")
-
-    def add_block(self, x, y):
-        """Add a block to the board at position (x, y)."""
-        if 0 <= x < self.size and 0 <= y < self.size:
-            self.grid[x][y] = 'X'  # Mark the block position
-            # print(f"Block added at ({x}, {y})")  # Debugging output
-        else:
-            print("Block position is out of the game boundaries")
-
+    def get_movable_pieces(self):
+        movable_pieces = []
+        for row in range(len(self.grid)):
+            for col in range(len(self.grid[row])):
+                piece = self.grid[row][col]
+                if isinstance(piece, Piece) and piece.piece_type != "iron":
+                    if any(self.can_move_piece(row, col, row + dx, col + dy) 
+                        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]):
+                        movable_pieces.append((row, col))
+        return movable_pieces
 
     def display_board(self):
         """Display the grid state for the user, marking targets with 'T' if empty and blocks with 'X'."""
@@ -393,130 +296,4 @@ class Board:
             print(row_display)
 
         print(" +" + "---" * self.size + "+")
-
-
-    def is_within_bounds(self, x, y):
-        """Check if the coordinates are within the board boundaries."""
-        return 0 <= x < self.size and 0 <= y < self.size
-
-    def can_move_piece(self, x, y, new_x, new_y):
-        """Check if a piece at (x, y) can move to (new_x, new_y)."""
-        if not self.is_within_bounds(x, y) or not self.is_within_bounds(new_x, new_y):
-            print("Move out of bounds.")
-            return False
-
-        piece = self.grid[x][y]
-        if piece is None:
-            print("No piece at starting position.")
-            return False
-
-        if piece.piece_type == "iron":
-            print("Iron pieces cannot be moved manually.")
-            return False
-
-        if self.grid[new_x][new_y] is not None:
-            print("Target cell is occupied.")
-            return False
-        
-        if self.grid[new_x][new_y] == 'X':
-            print("Cannot move to a block cell.")
-            return False
-
-        return True
-
-    def can_repel_piece(self, piece, target_x, target_y):
-        """Check if a piece can repel another piece considering blocks."""
-        if self.grid[target_x][target_y] == 'X':
-            print("Cannot repel due to a block cell.")
-            return False
-        return True
-    
-    def push_connected_iron_pieces_away(self, x, y):
-        """Push connected iron pieces away from the repulsive piece if possible."""
-        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]  # Up, Down, Left, Right
-        for dx, dy in directions:
-            nx, ny = x + dx, y + dy  # Check adjacent cells
-            if self.is_within_bounds(nx, ny):
-                target_piece = self.grid[nx][ny]
-                if isinstance(target_piece, Piece) and target_piece.piece_type == "iron":
-                    # Move the iron piece away from the repulsive piece
-                    target_new_x, target_new_y = x - dx, y - dy  # Move iron piece away from repulsive piece
-                    if self.is_within_bounds(target_new_x, target_new_y) and self.grid[target_new_x][target_new_y] is None:
-                        # Move the iron piece
-                        self.grid[target_new_x][target_new_y] = target_piece
-                        self.grid[nx][ny] = None
-                        target_piece.position = [target_new_x, target_new_y]
-
-    def move_piece(self, x, y, new_x, new_y):
-        if not self.can_move_piece(x, y, new_x, new_y):
-            print("Invalid move.")
-            return False
-
-        piece = self.grid[x][y]
-        self.grid[x][y] = None
-        self.grid[new_x][new_y] = piece
-        piece.position = [new_x, new_y]
-
-        print(f"Piece {piece} moved from ({x}, {y}) to ({new_x}, {new_y})")  # Debugging
-
-        # Apply magnetic effects
-        if piece.piece_type == "attractive":
-            self.move_adjacent_pieces_towards((new_x, new_y))
-        elif piece.piece_type == "repulsive":
-            self.move_adjacent_pieces_away((new_x, new_y))
-
-        self.save_state()
-        return True
-
-        
-    def move_piece_to(self, current_position, new_position):
-        """Helper method to move a piece to a new position."""
-        if self.is_within_bounds(new_position[0], new_position[1]) and self.grid[new_position[0]][new_position[1]] is None:
-            piece = self.grid[current_position[0]][current_position[1]]
-            if isinstance(piece, Piece):
-                self.grid[current_position[0]][current_position[1]] = None
-                piece.position = [new_position[0], new_position[1]]
-                self.grid[new_position[0]][new_position[1]] = piece
-
-    def pull_adjacent_iron_pieces(self, x, y):
-        """Pull adjacent iron pieces towards the attractive piece if possible."""
-        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]  # Up, Down, Left, Right
-        for dx, dy in directions:
-            nx, ny = x + dx, y + dy  # Check adjacent cells
-            if self.is_within_bounds(nx, ny):
-                target_piece = self.grid[nx][ny]
-                if isinstance(target_piece, Piece) and target_piece.piece_type == "iron":
-                    # Try to move the iron piece towards the attractive piece
-                    target_new_x, target_new_y = x + dx, y + dy  # Move iron piece towards attractive piece
-                    if self.is_within_bounds(target_new_x, target_new_y) and self.grid[target_new_x][target_new_y] is None:
-                        # Move the iron piece
-                        self.grid[target_new_x][target_new_y] = target_piece
-                        self.grid[nx][ny] = None
-                        target_piece.position = [target_new_x, target_new_y]
-
-    def apply_magnetic_effects(self, x, y):
-        """Apply attraction and repulsion effects around the moved piece."""
-        piece = self.grid[x][y]
-        if piece is None:
-            return
-
-        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-        for dx, dy in directions:
-            nx, ny = x + dx, y + dy
-            if self.is_within_bounds(nx, ny):
-                target_piece = self.grid[nx][ny]
-                if isinstance(target_piece, Piece):  # Check if target is a Piece object
-                    if target_piece.piece_type == "iron":
-                        if piece.piece_type == "attractive":
-                            self.pull_adjacent_iron_pieces(x, y)
-                        elif piece.piece_type == "repulsive":
-                            self.push_connected_iron_pieces_away(nx, ny)
-
-
-    def check_win_condition(self):
-        """Check if all target positions are occupied by pieces."""
-        for (x, y) in self.targets:
-            if self.grid[x][y] is None:
-                return False
-        return True 
 

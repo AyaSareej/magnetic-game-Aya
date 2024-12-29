@@ -2,7 +2,8 @@ from board import Board
 from bfs import BFSAlgorithm
 from ucs import UCSAlgorithm
 from HillClimbing import HillClimbingAlgorithm
-from dfs import DFSAlgorithm  # Import the DFS algorithm
+from dfs import DFSAlgorithm
+from a_star import AStarAlgorithm  
 
 
 class Game:
@@ -10,7 +11,6 @@ class Game:
         self.levels = [Level(level_data) for level_data in levels_data]
 
     def choose_level(self):
-        """Allow the player to choose a level."""
         print("Choose a level to play:")
         for i, level in enumerate(self.levels):
             print(f"Level {i + 1}: Board Size {level.board_size}")
@@ -34,7 +34,7 @@ class Level:
     def start(self):
         """Start the level."""
         print(f"Starting Level with board size {self.board_size}")
-        solve_method = input("Do you want to (M)anually solve the game, use (B)FS, (U)CS, (H)ill Climbing, or (D)FS to solve? (M/B/U/H/D): ").strip().upper()
+        solve_method = input("Do you want to (M)anually solve the game, use (B)FS, (U)CS, (H)ill Climbing, (D)FS, or (A)* to solve? (M/B/U/H/D/A): ").strip().upper()
 
         if solve_method in ["B", "BFS"]:
             self.solve_with_bfs()
@@ -44,6 +44,8 @@ class Level:
             self.solve_with_hill_climbing()
         elif solve_method in ["D", "DFS"]:
             self.solve_with_dfs()
+        elif solve_method in ["A", "A*"]:
+            self.solve_with_a_star()
         elif solve_method == "M":
             self.play()
         else:
@@ -55,54 +57,42 @@ class Level:
         print("Solving level using DFS...")
         dfs_solver = DFSAlgorithm(self.board)
         moves = dfs_solver.solve()
-        if moves:
-            print("Solution found!")
-            for i, (piece, move) in enumerate(moves):
-                print(f"Step {i + 1}: Move {piece} to {move}")
-            for piece, move in moves:
-                self.board.move_piece(piece.position[0], piece.position[1], move[0], move[1])
-                self.board.display_board()  # Show the board state after each move
-        else:
-            print("No solution found.")
+        self.display_solution(moves)
 
     def solve_with_hill_climbing(self):
         """Solve the level using Hill Climbing."""
         print("Solving level using Hill Climbing...")
         hill_solver = HillClimbingAlgorithm(self.board)
         moves = hill_solver.solve()
-        if moves:
-            print("Solution found!")
-            for i, (piece, move) in enumerate(moves):
-                print(f"Step {i + 1}: Move {piece} to {move}")
-            for piece, move in moves:
-                self.board.move_piece(piece.position[0], piece.position[1], move[0], move[1])
-                self.board.display_board()
-        else:
-            print("No solution found.")
+        self.display_solution(moves)
 
     def solve_with_ucs(self):
         """Solve the level using UCS."""
         print("Solving level using UCS...")
         ucs_solver = UCSAlgorithm(self.board)
         moves = ucs_solver.solve()
-        if moves:
-            print("Solution found!")
-            for i, (piece, move) in enumerate(moves):
-                print(f"Step {i + 1}: Move {piece} to {move}")
-            for piece, move in moves:
-                self.board.move_piece(piece.position[0], piece.position[1], move[0], move[1])
-                self.board.display_board()  # Show the board state after each move
+        self.display_solution(moves)
 
     def solve_with_bfs(self):
         """Solve the level using BFS."""
         print("Solving level using BFS...")
         bfs_solver = BFSAlgorithm(self.board)
         moves = bfs_solver.solve()
+        self.display_solution(moves)
+
+    def solve_with_a_star(self):
+        """Solve the level using A*."""
+        print("Solving level using A*...")
+        a_star_solver = AStarAlgorithm(self.board)
+        moves = a_star_solver.solve()
+        self.display_solution(moves)
+
+    def display_solution(self, moves):
+        """Display the solution moves."""
         if moves:
             print("Solution found!")
             for i, (piece, move) in enumerate(moves):
                 print(f"Step {i + 1}: Move {piece} to {move}")
-            for piece, move in moves:
                 self.board.move_piece(piece.position[0], piece.position[1], move[0], move[1])
                 self.board.display_board()  # Show the board state after each move
         else:

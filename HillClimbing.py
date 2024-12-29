@@ -1,4 +1,3 @@
-from collections import deque
 import copy
 import heapq
 
@@ -34,7 +33,6 @@ class HillClimbingAlgorithm:
         return total_distance
 
     def solve(self):
-        """Solve the game using Hill Climbing."""
         initial_state = self.get_state()
         pq = [(self.heuristic(self.board), self.board, [])]  # Priority queue (heuristic, board, moves)
         self.visited.add(initial_state)
@@ -71,23 +69,15 @@ class HillClimbingAlgorithm:
         print("No solution found.")
         return None
 
-
     def generate_all_possible_moves(self, game_instance):
         possible_moves = []
-        for piece in game_instance.pieces:
-            if piece.piece_type != "iron":  
-                valid_moves = game_instance.get_valid_moves_for_piece(piece)
-                for move in valid_moves:
-                    if game_instance.is_within_bounds(move[0], move[1]) and game_instance.grid[move[0]][move[1]] is None:
-                        possible_moves.append((piece, move))
-        return possible_moves
+        movable_pieces = game_instance.get_movable_pieces()
 
-    def move_piece(self, x, y, new_x, new_y):
-        print(f"Attempting to move piece from ({x}, {y}) to ({new_x}, {new_y})")
-        if not self.is_within_bounds(new_x, new_y):
-            print("Move out of bounds.")
-            return False
-        if self.grid[new_x][new_y] is not None:
-            print("Target cell is occupied.")
-            return False
-        return True
+        for piece_pos in movable_pieces:
+            piece = game_instance.grid[piece_pos[0]][piece_pos[1]]
+            valid_moves = game_instance.get_valid_moves_for_piece(piece)
+            
+            for move in valid_moves:
+                possible_moves.append((piece, move))
+        
+        return possible_moves

@@ -1,91 +1,71 @@
 import heapq
 import copy
 
+
 class UCSAlgorithm:
     def __init__(self, board):
         self.board = board
-        self.visited = set()
-
-    def get_state(self):
-        """
-        Returns a hashable state representation of the board.
-        Includes grid and pieces.
-        """
-        board_state = tuple(tuple(cell for cell in row) for row in self.board.get_grid())
-        piece_state = tuple(sorted((piece.piece_type, tuple(piece.position)) for piece in self.board.pieces))
-        return (board_state, piece_state)
-
-    def get_move_cost(self, piece, move):
-        """
-        Calculate the cost of a move.
-        In this case, the cost is always 1.
-        """
-        return 1
+        self.visited = set()  # Tracks visited states
+        self.board_state_map = {}  # Maps states to board instances
 
     def solve(self):
-        """
-        Solve the game using UCS (Uniform Cost Search).
-        """
         priority_queue = []
-        initial_state = self.get_state()
+        initial_state = self.board.get_state()
         state_costs = {initial_state: 0}
+
+        self.board_state_map[initial_state] = copy.deepcopy(self.board)
+        visited = set()
 
         if self.board.all_targets_filled():
             print("Already solved at the start!")
-            return []  # Already solved, no moves needed
+            return []
 
-        # Initialize the priority queue
-        heapq.heappush(priority_queue, (0, initial_state, []))  # Cost, State, Move Sequence
-        self.visited.add(initial_state)
+        heapq.heappush(priority_queue, (0, 0, initial_state, []))
+        visited.add(initial_state)
 
         while priority_queue:
-            current_cost, current_state, move_sequence = heapq.heappop(priority_queue)
+            _, current_cost, current_state, move_sequence = heapq.heappop(priority_queue)
+            
+            current_board = self.board_state_map[current_state]
 
-            # Restore the board state
-            board_state, piece_state = current_state
-            self.board.set_state((board_state, piece_state))
-
-            print(f"Exploring state with cost {current_cost}. Move sequence: {move_sequence}")
-
-            # Check for solution
-            if self.board.all_targets_filled():
+            if current_board.all_targets_filled():
                 print("Solution found!")
                 return move_sequence
 
-            # Generate possible moves
-            possible_moves = self.generate_all_possible_moves(self.board)
+            possible_moves = self.generate_all_possible_moves(current_board)
 
             for piece, move in possible_moves:
-                new_board = copy.deepcopy(self.board)
-                if new_board.move_piece(piece.position[0], piece.position[1], move[0], move[1]):
-                    new_state = self.get_state()
-                    move_cost = self.get_move_cost(piece, move)
+                new_board = copy.deepcopy(current_board)
+                
+                # Prevent moves into block cells
+                if new_board.grid[move[0]][move[1]] == 'X':
+                    continue  # Skip blocked paths
+
+                new_board.move_piece(piece.position[0], piece.position[1], move[0], move[1])
+                new_state = new_board.get_state()
+
+                if new_state not in visited:
+                    visited.add(new_state)
+                    move_cost = 1
                     new_total_cost = current_cost + move_cost
 
-                    # Debugging output for move evaluation
-                    print(f"Evaluating move: {piece} to {move}. Total cost: {new_total_cost}")
-
-                    if new_state not in self.visited or state_costs.get(new_state, float('inf')) > new_total_cost:
-                        self.visited.add(new_state)
-                        state_costs[new_state] = new_total_cost
-                        heapq.heappush(priority_queue, (new_total_cost, new_state, move_sequence + [(piece, move)]))
-
-            # Debugging output for priority queue
-            print(f"Priority queue length: {len(priority_queue)}")
+                    self.board_state_map[new_state] = new_board
+                    new_move_sequence = move_sequence + [(piece, move)]
+                    heapq.heappush(priority_queue, (new_total_cost, new_total_cost, new_state, new_move_sequence))
 
         print("No solution found.")
         return None
 
+
     def generate_all_possible_moves(self, game_instance):
-        """
-        Generate all valid moves for all movable pieces on the board.
-        """
         possible_moves = []
-        for piece in game_instance.pieces:
-            if piece.piece_type != "iron":  # Skip iron pieces, as they are immovable
-                valid_moves = game_instance.get_valid_moves_for_piece(piece)
-                for move in valid_moves:
-                    if game_instance.is_within_bounds(move[0], move[1]) and game_instance.grid[move[0]][move[1]] is None:
-                        possible_moves.append((piece, move))
-        print(f"Generated possible moves: {[(p.piece_type, m) for p, m in possible_moves]}")  # Debugging output
+        movable_pieces = game_instance.get_movable_pieces()
+
+        for piece_pos in movable_pieces:
+            piece = game_instance.grid[piece_pos[0]][piece_pos[1]]
+            valid_moves = game_instance.get_valid_moves_for_piece(piece)
+            
+            for move in valid_moves:
+                possible_moves.append((piece, move))
+        
         return possible_moves
